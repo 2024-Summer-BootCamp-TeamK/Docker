@@ -1,19 +1,19 @@
 version: '3'
 services:
-    django:
-        build:
-            context: ./Backend
-        container_name: django
-        command: python manage.py runserver 0:8000
-        ports:
-            - "8000:8000"
-        restart: always
-        depends_on:
-            - mysqldb
-        env_file:
-            - .env
-        networks:
-            - app-tier
+#    django:
+#        build:
+#            context: ./Backend
+#        container_name: django
+#        command: python manage.py runserver 0:8000
+#        ports:
+#            - "8000:8000"
+#        restart: always
+#        depends_on:
+#            - mysqldb
+#        env_file:
+#            - .env
+#        networks:
+#            - app-tier
 
     mysqldb:
         image: mysql:latest
