@@ -1,0 +1,34 @@
+version: '3'
+services:
+    django:
+        build:
+            context: ./Backend
+        container_name: django
+        command: python manage.py runserver 0:8000
+        ports:
+            - "8000:8000"
+        restart: always
+        depends_on:
+            - mysqldb
+        env_file:
+            - .env
+        networks:
+            - app-tier
+
+    mysqldb:
+        image: mysql:latest
+        env_file:
+            - .env
+        ports:
+            - '3306:3306'
+        volumes:
+            - 'mysqldata:/var/lib/mysql'
+        networks:
+            - app-tier
+
+volumes:
+    mysqldata:
+
+networks:
+    app-tier:
+        driver: bridge
