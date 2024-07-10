@@ -1,19 +1,21 @@
 version: '3'
 services:
-#    django:
-#        build:
-#            context: ./Backend
-#        container_name: django
-#        command: python manage.py runserver 0:8000
-#        ports:
-#            - "8000:8000"
-#        restart: always
-#        depends_on:
-#            - mysqldb
-#        env_file:
-#            - .env
-#        networks:
-#            - app-tier
+    django:
+        build:
+            context: ./Backend/myproject
+        container_name: django
+        command: python manage.py runserver 0:8000
+        ports:
+            - "8000:8000"
+        restart: always
+        depends_on:
+            - mysqldb
+        env_file:
+            - .env
+        volumes:
+            - './Backend/myproject:/backend'
+        networks:
+            - app-tier
 
     mysqldb:
         image: mysql:latest
@@ -44,9 +46,40 @@ services:
       image: "redis:alpine"
       ports:
         - "6379:6379"
+      networks:
+        - app-tier
+
+    rabbitmq:
+      image: "rabbitmq:3-management"
+      container_name: rabbitmq
+      env_file:
+        - .env
+      ports:
+        - "5672:5672"
+        - "15672:15672"
+      volumes:
+        - rabbitmq_data:/var/lib/rabbitmq
+      networks:
+        - app-tier
+
+    celery:
+      build: ./Backend/myproject
+      container_name: celery_worker
+      command: celery -A myproject worker --loglevel=info --pool=prefork
+      env_file:
+        - .env
+      depends_on:
+        - rabbitmq
+        - redis
+        - mysqldb
+      volumes:
+        - './Backend/myproject:/backend'
+      networks:
+        - app-tier
 
 volumes:
     mysqldata:
+    rabbitmq_data:
 
 networks:
     app-tier:
