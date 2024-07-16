@@ -5,8 +5,10 @@ services:
             context: ./Backend/myproject
         container_name: django
         command: >
-          sh -c "python manage.py migrate &&
-                   python manage.py runserver 0:8000"
+          sh -c "python manage.py makemigrations &&
+                python manage.py migrate &&
+                python manage.py runserver"
+#                daphne -b 0.0.0.0 -p 8000 myproject.asgi:application"      소켓통신용 (swagger 안들어가짐 나중에 api 연동할땐 이걸로)
         ports:
             - "8000:8000"
         restart: always
