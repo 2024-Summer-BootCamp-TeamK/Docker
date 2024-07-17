@@ -79,6 +79,21 @@ services:
       networks:
         - app-tier
 
+    celery_beat:
+      build: ./Backend/myproject
+      container_name: celery_beat
+      command: celery -A myproject beat --loglevel=info --scheduler django_celery_beat.schedulers:DatabaseScheduler
+      env_file:
+        - .env
+      depends_on:
+        - rabbitmq
+        - redis
+        - mysqldb
+      volumes:
+        - './Backend/myproject:/backend'
+      networks:
+        - app-tier
+
 volumes:
     mysqldata:
     rabbitmq_data:
