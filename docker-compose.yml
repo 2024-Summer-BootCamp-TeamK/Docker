@@ -94,7 +94,7 @@ services:
       ports:
         - "5173:5173"
       volumes:
-        - ./frontend:/app/frontend
+        - ./Frontend:/app/frontend
       networks:
         - app-tier
 
