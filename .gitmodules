@@ -1,9 +1,9 @@
 [submodule "Backend"]
 	path = Backend
 	url = https://github.com/2024-Summer-BootCamp-TeamK/Backend.git
-	branch = develop
+	branch = "env/#67"
 
 [submodule "Frontend"]
 	path = Frontend
 	url = https://github.com/2024-Summer-BootCamp-TeamK/Frontend.git
-	branch = "env/#23"
+	branch = "develop"

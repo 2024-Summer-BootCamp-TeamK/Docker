@@ -1,136 +1,167 @@
 version: '3'
 services:
-    django:
-        build:
-            context: ./Backend/myproject
-        container_name: django
-        command: >
-          sh -c "python manage.py makemigrations &&
-                python manage.py migrate &&
-                python manage.py collectstatic --noinput &&
-                daphne -b 0.0.0.0 -p 8000 myproject.asgi:application"
-        ports:
-            - "8000:8000"
-        restart: always
-        depends_on:
-            - mysqldb
-        env_file:
-            - .env
-        volumes:
-            - './Backend/myproject:/backend'
-        networks:
-            - app-tier
+  django:
+    build:
+      context: ./Backend/myproject
+    container_name: django
+    command: >
+      sh -c "python manage.py makemigrations &&
+            python manage.py migrate &&
+            python manage.py collectstatic --noinput &&
+            daphne -b 0.0.0.0 -p 8000 myproject.asgi:application"
+    ports:
+      - "8000:8000"
+    restart: always
+    depends_on:
+      - mysqldb
+    env_file:
+      - .env
+    volumes:
+      - './Backend/myproject:/backend'
+    networks:
+      - app-tier
 
-    mysqldb:
-        image: mysql:latest
-        env_file:
-            - .env
-        ports:
-            - '3306:3306'
-        volumes:
-            - 'mysqldata:/var/lib/mysql'
-        networks:
-            - app-tier
+  mysqldb:
+    image: mysql:latest
+    env_file:
+      - .env
+    ports:
+      - '3306:3306'
+    volumes:
+      - 'mysqldata:/var/lib/mysql'
+    networks:
+      - app-tier
 
-    phpmyadmin:
-        image: phpmyadmin
-        restart: always
-        links:
-          - mysqldb
-        ports:
-          - 8080:80
-        environment:
-          PMA_ARBITRARY: 1
-          PMA_HOST: mysqldb
-          PMA_PORT: 3306
-        networks:
-          - app-tier
+  phpmyadmin:
+    image: phpmyadmin
+    restart: always
+    links:
+      - mysqldb
+    ports:
+      - 8081:80  # 변경된 포트
+    environment:
+      PMA_ARBITRARY: 1
+      PMA_HOST: mysqldb
+      PMA_PORT: 3306
+    networks:
+      - app-tier
 
-    redis:
-      image: "redis:alpine"
-      ports:
-        - "6379:6379"
-      networks:
-        - app-tier
+  redis:
+    image: "redis:alpine"
+    ports:
+      - "6379:6379"
+    networks:
+      - app-tier
 
-    rabbitmq:
-      image: "rabbitmq:3-management"
-      container_name: rabbitmq
-      env_file:
-        - .env
-      ports:
-        - "5672:5672"
-        - "15672:15672"
-      volumes:
-        - rabbitmq_data:/var/lib/rabbitmq
-      networks:
-        - app-tier
+  rabbitmq:
+    image: "rabbitmq:3-management"
+    container_name: rabbitmq
+    env_file:
+      - .env
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    networks:
+      - app-tier
 
-    celery:
-      build: ./Backend/myproject
-      container_name: celery_worker
-      command: celery -A myproject worker --loglevel=info --pool=prefork
-      env_file:
-        - .env
-      depends_on:
-        - rabbitmq
-        - redis
-        - mysqldb
-      volumes:
-        - './Backend/myproject:/backend'
-      networks:
-        - app-tier
+  celery:
+    build:
+      context: ./Backend/myproject
+      dockerfile: Dockerfile.celery
+    container_name: celery_worker
+    command: celery -A myproject worker --loglevel=info --pool=prefork
+    env_file:
+      - .env
+    depends_on:
+      - rabbitmq
+      - redis
+      - mysqldb
+    volumes:
+      - './Backend/myproject:/backend'
+    networks:
+      - app-tier
 
-    celery_beat:
-      build: ./Backend/myproject
-      container_name: celery_beat
-      command: celery -A myproject beat --loglevel=info --scheduler django_celery_beat.schedulers:DatabaseScheduler
-      env_file:
-        - .env
-      depends_on:
-        - rabbitmq
-        - redis
-        - mysqldb
-      volumes:
-        - './Backend/myproject:/backend'
-      networks:
-        - app-tier
+  celery_beat:
+    build:
+      context: ./Backend/myproject
+      dockerfile: Dockerfile.celery
+    container_name: celery_beat
+    command: celery -A myproject beat --loglevel=info --scheduler django_celery_beat.schedulers:DatabaseScheduler
+    env_file:
+      - .env
+    depends_on:
+      - rabbitmq
+      - redis
+      - mysqldb
+    volumes:
+      - './Backend/myproject:/backend'
+    networks:
+      - app-tier
 
-    react:
-      build:
-        context: ./frontend
-      restart: always
-      command: >
-        sh -c "npm install &&
-              npm run dev"
-      container_name: front
-      stdin_open: true
-      ports:
-        - "5173:5173"
-      volumes:
-        - ./frontend:/app/frontend
-      networks:
-        - app-tier
+  react:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: react_app
+    ports:
+      - "5173:80"  # 변경된 포트
+    networks:
+      - app-tier
 
+  nginx:
+    build:
+      context: ./nginx
+    ports:
+      - "8080:80"  # NGINX가 80 포트에서 호스트의 80 포트로 연결
+    volumes:
+      - ./Backend/myproject/static:/static  # 정적 파일 경로 수정
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro  # 사용자 정의 NGINX 설정 파일을 마운트
+      - ./html:/usr/share/nginx/html:ro  # 필요한 경우 정적 파일들을 마운트
+    depends_on:
+      - django
+    networks:
+      - app-tier
 
-    nginx:
-      build:
-        context: ./nginx
-      ports:
-        - "80:80"  # NGINX가 80 포트에서 호스트의 80 포트로 연결
-      volumes:
-        - ./Backend/myproject/static:/static  # 정적 파일 경로 수정
-        - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro  # 사용자 정의 NGINX 설정 파일을 마운트
-        - ./html:/usr/share/nginx/html:ro  # 필요한 경우 정적 파일들을 마운트
-      depends_on:
-        - django
-      networks:
-        - app-tier
+  prometheus:
+    image: prom/prometheus
+    container_name: prometheus
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml
+    ports:
+      - "9090:9090"
+    networks:
+      - app-tier
+
+  cadvisor:
+    image: google/cadvisor:latest
+    container_name: cadvisor
+    ports:
+      - "8082:8080"  # 변경된 포트
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:ro
+      - /sys:/sys:ro
+      - /dev/disk:/dev/disk:ro
+    networks:
+      - app-tier
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: grafana
+    ports:
+      - "3000:3000"
+    volumes:
+      - grafana_data:/var/lib/grafana
+    networks:
+      - app-tier
 
 volumes:
-    mysqldata:
-    rabbitmq_data:
+  mysqldata:
+  rabbitmq_data:
+  grafana_data:
 
 networks:
-    app-tier:
-        driver: bridge
+  app-tier:
+    driver: bridge
