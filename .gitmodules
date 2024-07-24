@@ -6,4 +6,4 @@
 [submodule "Frontend"]
 	path = Frontend
 	url = https://github.com/2024-Summer-BootCamp-TeamK/Frontend.git
-	branch = "env/#23"
+	branch = develop
