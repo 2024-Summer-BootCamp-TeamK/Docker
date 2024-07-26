@@ -104,14 +104,32 @@ services:
         context: ./nginx
       ports:
         - "80:80"  # NGINX가 80 포트에서 호스트의 80 포트로 연결
+        - "443:443"
       volumes:
         - ./Backend/myproject/static:/static  # 정적 파일 경로 수정
         - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro  # 사용자 정의 NGINX 설정 파일을 마운트
         - ./html:/usr/share/nginx/html:ro  # 필요한 경우 정적 파일들을 마운트
+        - ./certbot/conf:/etc/letsencrypt
+        - ./certbot/www:/var/www/certbot
       depends_on:
         - django
+        - react
+      command: "/bin/sh -c 'while :; do sleep 6h & wait $${!}; nginx -s reload; done & nginx -g \"daemon off;\"'"
       networks:
         - app-tier
+
+    certbot:
+      image: certbot/certbot
+      restart: unless-stopped
+      container_name: certbot
+      volumes:
+        - ./certbot/conf:/etc/letsencrypt
+        - ./certbot/www:/var/www/certbot
+      depends_on:
+        - nginx
+      entrypoint: "/bin/sh -c 'trap exit TERM; while :; do certbot renew; sleep 12h & wait $${!}; done;'"
+
+
 
 volumes:
     mysqldata:
