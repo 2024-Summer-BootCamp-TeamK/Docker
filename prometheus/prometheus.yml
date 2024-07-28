@@ -18,3 +18,11 @@ scrape_configs:
   - job_name: 'prometheus-data' #프로메테우스 "job_name" 이름
     static_configs: #메트릭 수집 설정
       - targets: [ 'prometheus:9090' ]
+
+  - job_name: 'rabbitmq-data' #job 이름
+    static_configs:
+      - targets: [ 'rabbitmq:15692' ] #<서비스_이름>:<포트>
+
+  - job_name: 'redis-data' #job 이름
+    static_configs:
+      - targets: [ 'redis-exporter:9121' ] #<서비스_이름>:<포트>
