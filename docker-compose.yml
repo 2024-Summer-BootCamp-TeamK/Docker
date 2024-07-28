@@ -80,7 +80,7 @@ services:
       networks:
         - app-tier
 
-    celery:
+    celery_worker:
       build: ./Backend/myproject
       container_name: celery_worker
       ports:

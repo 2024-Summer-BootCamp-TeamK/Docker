@@ -26,3 +26,7 @@ scrape_configs:
   - job_name: 'redis-data' #job 이름
     static_configs:
       - targets: [ 'redis-exporter:9121' ] #<서비스_이름>:<포트>
+
+  - job_name: 'celery-data' #job 이름
+    static_configs:
+      - targets: [ 'celery_worker:5555' ] #<서비스_이름>:<포트>
