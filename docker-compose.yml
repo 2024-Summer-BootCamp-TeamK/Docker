@@ -29,6 +29,7 @@ services:
             - '3306:3306'
         volumes:
             - 'mysqldata:/var/lib/mysql'
+        restart: always
         networks:
             - app-tier
 
@@ -94,6 +95,7 @@ services:
       volumes:
         - './Backend/myproject:/backend'
       command: sh -c "sh start_celery_flower.sh" # 스크립 파일 실행
+      restart: always
       networks:
         - app-tier
 
@@ -109,6 +111,7 @@ services:
         - mysqldb
       volumes:
         - './Backend/myproject:/backend'
+      restart: always
       networks:
         - app-tier
 
