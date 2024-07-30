@@ -1,0 +1,40 @@
+global:
+  scrape_interval: 20s
+  scrape_timeout: 10s
+
+alerting:
+  alertmanagers:
+  - static_configs:
+    - targets: ['alertmanager:9093']
+
+rule_files:
+  - /etc/prometheus/alert-rules.yml #추가된 부분
+
+scrape_configs:
+  - job_name: 'django-data'
+    static_configs:
+      - targets: [ 'django:8000' ]
+
+  - job_name: 'prometheus-data' #프로메테우스 "job_name" 이름
+    static_configs: #메트릭 수집 설정
+      - targets: [ 'prometheus:9090' ]
+
+  - job_name: 'rabbitmq-data' #job 이름
+    static_configs:
+      - targets: [ 'rabbitmq:15692' ] #<서비스_이름>:<포트>
+
+  - job_name: 'redis-data' #job 이름
+    static_configs:
+      - targets: [ 'redis-exporter:9121' ] #<서비스_이름>:<포트>
+
+  - job_name: 'celery-data' #job 이름
+    static_configs:
+      - targets: [ 'celery_worker:5555' ] #<서비스_이름>:<포트>
+
+  - job_name: 'nginx-data' #정하고 싶은 이름
+    static_configs:
+      - targets: [ 'nginx-exporter:9113' ] #<서비스_이름>:<포트>
+
+  - job_name: 'cadvisor-data' #job 이름
+    static_configs:
+      - targets: [ 'cadvisor:8080' ] #<서비스_이름>:<포트>

@@ -32,30 +32,59 @@ services:
         networks:
             - app-tier
 
+    phpmyadmin:
+        image: phpmyadmin
+        restart: always
+        links:
+          - mysqldb
+        ports:
+          - 8081:80
+        environment:
+          PMA_ARBITRARY: 1
+          PMA_HOST: mysqldb
+          PMA_PORT: 3306
+        networks:
+          - app-tier
+
     redis:
-      image: "redis:alpine"
+      image: "redis:latest"
       ports:
         - "6379:6379"
       networks:
         - app-tier
+      restart: always #연결용 재시작
+
+    redis-exporter:
+      image: oliver006/redis_exporter:latest # 이미지
+      container_name: redis_exporter
+      environment:
+        - REDIS_ADDR=redis:6379 # 레디스 주소. 여기로 데이터를 받아옵니다. <host_ip>:<port>
+      ports:
+        - "9121:9121" #포트 9121 매핑
+      networks:
+        - app-tier #프로메테우스, redis, 등등과 같은 네트워크
 
     rabbitmq:
-      image: "rabbitmq:3-management"
+      image: "rabbitmq:management"
       container_name: rabbitmq
       env_file:
         - .env
       ports:
         - "5672:5672"
         - "15672:15672"
+        - "15692:15692" #metrics 포트
+      restart: always # 연결 끊어질시 다시 시작용
+      tty: true # 끊어짐 방지
       volumes:
         - rabbitmq_data:/var/lib/rabbitmq
       networks:
         - app-tier
 
-    celery:
+    celery_worker:
       build: ./Backend/myproject
       container_name: celery_worker
-      command: celery -A myproject worker --loglevel=info --pool=prefork
+      ports:
+        - '5555:5555' #5555 포트 매핑
       env_file:
         - .env
       depends_on:
@@ -64,6 +93,7 @@ services:
         - mysqldb
       volumes:
         - './Backend/myproject:/backend'
+      command: sh -c "sh start_celery_flower.sh" # 스크립 파일 실행
       networks:
         - app-tier
 
@@ -102,18 +132,20 @@ services:
     nginx:
       build:
         context: ./nginx
+      container_name: nginx
       ports:
         - "80:80"  # NGINX가 80 포트에서 호스트의 80 포트로 연결
         - "443:443"
       volumes:
         - ./Backend/myproject/static:/static  # 정적 파일 경로 수정
-        - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro  # 사용자 정의 NGINX 설정 파일을 마운트
-        - ./html:/usr/share/nginx/html:ro  # 필요한 경우 정적 파일들을 마운트
+        - ./nginx/nginx.conf:/etc/nginx/nginx.conf  # 사용자 정의 NGINX 설정 파일을 마운트
+        - ./html:/usr/share/nginx/html  # 필요한 경우 정적 파일들을 마운트
         - ./certbot/conf:/etc/letsencrypt
         - ./certbot/www:/var/www/certbot
       depends_on:
         - django
         - react
+      restart: always
       command: "/bin/sh -c 'while :; do sleep 6h & wait $${!}; nginx -s reload; done & nginx -g \"daemon off;\"'"
       networks:
         - app-tier
@@ -128,6 +160,69 @@ services:
       depends_on:
         - nginx
       entrypoint: "/bin/sh -c 'trap exit TERM; while :; do certbot renew; sleep 12h & wait $${!}; done;'"
+
+
+    nginx-exporter: #서비스 이름
+      image: nginx/nginx-prometheus-exporter:latest #엑스포터 이미지
+      container_name: nginx-exporter #컨테이너 이름
+      ports:
+        - "9113:9113" #엑스포터 포트. 포트/metrics로 데이터를 노출시킵니다.
+      command: --nginx.scrape-uri=http://nginx:80/stub_status # 엔진엑스 /stub_status에서 데이터를 가지고 오라는 설정.
+      depends_on:
+        - nginx #엔진엑스가 작동해야지 이거도 쓸모가 있겠죠?
+      networks:
+        - app-tier #엔진엑스와 같은 네트워크
+
+
+    prometheus:
+      image: prom/prometheus:v2.45.6
+      container_name: prometheus
+      ports:
+        - "9090:9090"
+      volumes:
+        - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+        - ./prometheus/alert-rules.yml:/etc/prometheus/alert-rules.yml #추가된 부분
+      command:
+        - '--config.file=/etc/prometheus/prometheus.yml'
+      networks:
+        - app-tier
+
+    grafana: #서비스 이름
+      image: grafana/grafana:9.5.20 #이미지 이름:태그. 태그는 latest등등도 괜찮습니다.
+      container_name: grafana #컨테이너 이름. 아무거나 괜찮습니다
+      volumes:
+        - ./grafana:/etc/grafana/provisioning #그라파나 설정(config) 볼륨. 대부분 불필요 합지만 놔두시는게 좋습니다.
+        - ./grafana/data:/var/lib/grafana #그라파나 대시보드 데이터. 이걸 설정 해둬야지 가상 볼륨을 날리셔도 대시보드들이 남아있습니다.
+      ports:
+        - "3000:3000" #그라파나는 기본적으로 3000번 포트 입니다
+      networks:
+        - app-tier #이 부분은 프로메테우스랑 같은 네트워크로 두면 됩니다.
+
+    cadvisor: #서비스 이름
+      image: gcr.io/cadvisor/cadvisor:v0.49.1 #이미지
+      container_name: cadvisor
+      ports:
+        - "8080:8080" #포트 8080 매핑
+      volumes:
+        - /:/rootfs:ro #읽기 전용 데이터 - 루트 파일 시스템
+        - /var/run:/var/run:rw #읽기 & 쓰기 - 런타임 데이터
+        - /sys:/sys:ro  #읽기 전용 데이터 - 커널, 하드웨어, 드라이버 정보 등등
+        - /var/lib/docker/:/var/lib/docker:ro #읽기 전용 데이터 - 도커 정보 데이터
+      networks:
+        - app-tier #같은 네트워크
+
+    alertmanager: #이미지
+      image: prom/alertmanager:main
+      container_name: alertmanager
+      ports:
+        - "9093:9093" #포트 9093 매핑
+      volumes:
+        - ./alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml #설정파일 볼륨 추가
+        - ./alertmanager/tmp:/data/ #데이터 담기 전용
+      networks:
+        - app-tier #같은 네트워크
+      command: --config.file=/etc/alertmanager/alertmanager.yml --log.level=debug #설정파일 설정
+
 
 
 
