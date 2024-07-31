@@ -66,16 +66,14 @@ services:
 #        - app-tier #프로메테우스, redis, 등등과 같은 네트워크
 
     rabbitmq:
-      image: "rabbitmq:management"
+      image: "rabbitmq:3-management"
       container_name: rabbitmq
       env_file:
         - .env
       ports:
         - "5672:5672"
         - "15672:15672"
-        - "15692:15692" #metrics 포트
       restart: always # 연결 끊어질시 다시 시작용
-      tty: true # 끊어짐 방지
       volumes:
         - rabbitmq_data:/var/lib/rabbitmq
       networks:
